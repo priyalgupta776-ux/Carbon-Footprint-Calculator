@@ -2,25 +2,33 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.awt.Desktop;
+import java.io.File;
 
 public class CarbonFootprintGUI extends JFrame implements ActionListener {
 
     private JTextField electricityField, transportField, wasteField;
     private JLabel resultLabel, categoryLabel;
-    private JButton calcButton, tipsButton, resetButton;
+    private JButton calcButton, tipsButton, resetButton, downloadButton;
     private double electricity, transport, waste, totalCO2;
     private PieChartPanel pieChartPanel;
     private String category;
+    private Color color;
+    private static final Color low = new Color(0, 153, 0);
+    private static final Color medium = new Color(255, 153, 0);
+    private static final Color high = Color.RED;
 
     public CarbonFootprintGUI() {
         setTitle("Carbon Footprint Estimator with Chart");
-        setSize(650, 450);
+        setSize(750, 650);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
         // --- Top panel for inputs ---
-        JPanel inputPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        JPanel inputPanel = new JPanel(new GridLayout(5, 3, 10, 10));
         inputPanel.setBorder(BorderFactory.createTitledBorder("Enter Monthly Data"));
 
         inputPanel.add(new JLabel("Electricity (kWh):"));
@@ -40,8 +48,12 @@ public class CarbonFootprintGUI extends JFrame implements ActionListener {
         inputPanel.add(calcButton);
 
         tipsButton = new JButton("Show Eco Tips");
-        tipsButton.addActionListener(e -> showEcoTips());
+        tipsButton.addActionListener(this);
         inputPanel.add(tipsButton);
+
+        downloadButton = new JButton("Download Report");
+        downloadButton.addActionListener(this);
+        inputPanel.add(downloadButton);
 
         add(inputPanel, BorderLayout.NORTH);
 
@@ -55,7 +67,7 @@ public class CarbonFootprintGUI extends JFrame implements ActionListener {
         categoryLabel = new JLabel("", SwingConstants.CENTER);
 
         resetButton = new JButton("🔄 Reset");
-        resetButton.addActionListener(e -> resetFields());
+        resetButton.addActionListener(this);
 
         bottomPanel.add(resultLabel);
         bottomPanel.add(categoryLabel);
@@ -64,55 +76,103 @@ public class CarbonFootprintGUI extends JFrame implements ActionListener {
         add(bottomPanel, BorderLayout.SOUTH);
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
+    public void downloadReport() {
+        try {
+            FileWriter report = new FileWriter("CarbonFootprintReport.txt");
+            report.write("Carbon Footprint Report\n\n");
+
+            report.write("Electricity : " + electricity + " kWh\n");
+            report.write("Transport   : " + transport + " litres\n");
+            report.write("Waste       : " + waste + " kg\n\n");
+
+            report.write("Total CO2   : " + totalCO2 + " kg/month\n");
+            report.write("Category    : " + category + "\n");
+
+            report.close();
+            Desktop.getDesktop().open(new File("CarbonFootprintReport.txt"));
+
+
+            JOptionPane.showMessageDialog(this,
+                    "Report downloaded successfully!");
+
+        } catch (IOException ex) {
+
+            JOptionPane.showMessageDialog(this,
+                    "Error saving file.");
+        }
+    }
+
+
+    public void calculateCO2() {
+        readInput();
+        calculateAnswer();
+        showOutput();
+    }
+
+    public void readInput() {
         try {
             electricity = Double.parseDouble(electricityField.getText());
             transport = Double.parseDouble(transportField.getText());
             waste = Double.parseDouble(wasteField.getText());
-
-            // Calculate CO₂
-            totalCO2 = (electricity * 0.5) + (transport * 2.3) + (waste * 0.1);
-
-            // Determine category
-            Color color;
-            if (totalCO2 < 200) {
-                category = "Low Emissions 🌿";
-                color = new Color(0, 153, 0);
-            } else if (totalCO2 < 500) {
-                category = "Medium Emissions ⚡";
-                color = new Color(255, 153, 0);
-            } else {
-                category = "High Emissions 🚗";
-                color = Color.RED;
-            }
-
-            resultLabel.setText(String.format("Total CO₂: %.2f kg/month", totalCO2));
-            categoryLabel.setText(category);
-            categoryLabel.setForeground(color);
-
-            // Update pie chart
-            pieChartPanel.updateValues(electricity, transport, waste);
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Please enter valid numeric values!", "Input Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void showEcoTips() {
+    public void calculateAnswer() {
+        totalCO2 = (electricity * 0.5) + (transport * 2.3) + (waste * 0.1);
+        if (totalCO2 < 200) {
+            category = "Low Emissions 🌿";
+            color =low;
+        } else if (totalCO2 < 500) {
+            category = "Medium Emissions ⚡";
+            color = medium;
+        } else {
+            category = "High Emissions 🚗";
+            color = high;
+        }
+    }
+
+
+    public void showOutput() {
+        resultLabel.setText(String.format("Total CO₂: %.2f kg/month", totalCO2));
+        categoryLabel.setText(category);
+        categoryLabel.setForeground(color);
+        pieChartPanel.updateValues(electricity, transport, waste);
+
+
+    }
+
+    public void showTips() {
         JOptionPane.showMessageDialog(this,
                 "🌱 Eco-Friendly Tips:\n" +
                         "1. Switch to energy-efficient bulbs.\n" +
                         "2. Walk, bike, or use public transport.\n" +
                         "3. Recycle and compost regularly.\n" +
                         "4. Reduce air conditioner use.\n" +
-                        "5. Plant more trees 🌳.",
+                        "5. Plant more trees.",
                 "Eco Tips",
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == calcButton) {
+            calculateCO2();
+        } else if (e.getSource() == tipsButton) {
+            showTips();
+        } else if (e.getSource() == downloadButton) {
+            downloadReport();
+        } else {
+            resetAll();
+        }
+    }
+
+
     // --- Reset all input fields and chart ---
-    private void resetFields() {
+    public void resetAll() {
         electricityField.setText("");
         transportField.setText("");
         wasteField.setText("");
@@ -123,59 +183,9 @@ public class CarbonFootprintGUI extends JFrame implements ActionListener {
         totalCO2 = 0;
     }
 
-    // --- Inner class for drawing pie chart ---
-    class PieChartPanel extends JPanel {
-        private double elecVal, transVal, wasteVal;
-
-        public void updateValues(double e, double t, double w) {
-            this.elecVal = e;
-            this.transVal = t;
-            this.wasteVal = w;
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            double total = elecVal + transVal + wasteVal;
-            if (total == 0) return;
-
-            int diameter = 220;
-            int x = (getWidth() - diameter) / 2;
-            int y = 30;
-
-            double elecAngle = (elecVal / total) * 360;
-            double transAngle = (transVal / total) * 360;
-            double wasteAngle = (wasteVal / total) * 360;
-
-            g.setColor(Color.CYAN);
-            g.fillArc(x, y, diameter, diameter, 0, (int) elecAngle);
-
-            g.setColor(Color.ORANGE);
-            g.fillArc(x, y, diameter, diameter, (int) elecAngle, (int) transAngle);
-
-            g.setColor(Color.LIGHT_GRAY);
-            g.fillArc(x, y, diameter, diameter, (int) (elecAngle + transAngle), (int) wasteAngle);
-
-            // Legend
-            g.setColor(Color.BLACK);
-            g.drawString("Electricity", x + 20, y + diameter + 25);
-            g.setColor(Color.CYAN);
-            g.fillRect(x, y + diameter + 15, 10, 10);
-
-            g.setColor(Color.BLACK);
-            g.drawString("Transport", x + 120, y + diameter + 25);
-            g.setColor(Color.ORANGE);
-            g.fillRect(x + 100, y + diameter + 15, 10, 10);
-
-            g.setColor(Color.BLACK);
-            g.drawString("Waste", x + 220, y + diameter + 25);
-            g.setColor(Color.LIGHT_GRAY);
-            g.fillRect(x + 200, y + diameter + 15, 10, 10);
-        }
-    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new CarbonFootprintGUI().setVisible(true));
     }
 }
+
