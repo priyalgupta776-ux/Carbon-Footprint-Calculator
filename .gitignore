@@ -30,3 +30,6 @@ bin/
 .DS_Store
 
 CarbonFootprintReport.txt
+
+.idea/
+*.iml
